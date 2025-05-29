@@ -13,7 +13,7 @@ If you are interested in exporting the full data in a file to a dataframe, impor
 
     import FFPE.BioLogic.cycle_metrics
 
-    experiment = FFPE.BioLogic.cycle_metrics.BiologicExperiment()
+    experiment = FFPE.BioLogic.cycle_metrics.BiologicExperiment(<BioLogic software version>)
     experiment.fromFile("<PATH TO MPR FILE>")
     
 Then, the extracted data is available in `experiment.measurement_sequence`.
