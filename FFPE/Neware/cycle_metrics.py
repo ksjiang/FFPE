@@ -1,19 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Aug 28 13:02:41 2023
 
-@author: Kyle
-"""
-
-import BTSff
-import os
-
-# this directory
-MYDIR = os.path.dirname(__file__)
-
-import sys
-sys.path.append(os.path.join(MYDIR, "../General/"))
-import cycle_tools
+import FFPE.Neware.NDAff as NDAff
+import FFPE.Util.cycle_tools as cycle_tools
 
 # class representing experiments recorded by MTI Cycler
 class MTICycExperiment(object):
@@ -22,7 +9,7 @@ class MTICycExperiment(object):
     
     # instantiate fromFile
     def fromFile(self, fileName):
-        x1, x2, Y = BTSff.fromFile(fileName)
+        x1, x2, Y = NDAff.fromFile(fileName)
         self.metadata = [x1, x2]
         self.measurement_sequence = Y
         return

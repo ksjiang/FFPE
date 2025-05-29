@@ -1,19 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Aug 28 13:02:41 2023
 
-@author: Kyle
-"""
-
-import VMPff
-import os
-
-# this directory
-MYDIR = os.path.dirname(__file__)
-
-import sys
-sys.path.append(os.path.join(MYDIR, "../General/"))
-import cycle_tools
+import FFPE.BioLogic.MPRff as MPRff
+import FFPE.Util.cycle_tools as cycle_tools
 
 # class representing experiments recorded by Biologic
 class BiologicExperiment(object):
@@ -25,7 +12,7 @@ class BiologicExperiment(object):
     
     # instantiate fromFile
     def fromFile(self, fileName):
-        x, y = VMPff.fromFile(fileName, self.version)
+        x, y = MPRff.fromFile(fileName, self.version)
         self.metadata = [x]
         # default to vectorized parsing, because it is FAST!
         self.measurement_sequence = y.getDataFrame(mp = "Vec")
@@ -35,7 +22,7 @@ class BiologicExperiment(object):
         if include_rest:
             indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == cycle) & (self.measurement_sequence["half cycle"] == self.hc + half_cycle)].index
         else:
-            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == cycle) & (self.measurement_sequence["half cycle"] == self.hc + half_cycle) & (self.measurement_sequence["mode"] != VMPff.REST_MODE)].index
+            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == cycle) & (self.measurement_sequence["half cycle"] == self.hc + half_cycle) & (self.measurement_sequence["mode"] != MPRff.REST_MODE)].index
             
         return indices
     

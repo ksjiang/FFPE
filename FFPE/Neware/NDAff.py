@@ -1,21 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Nov 29 01:49:29 2023
-
-@author: Kyle
-"""
-
-import os
 
 import time
 import numpy as np
 import pandas as pd
-
-MYDIR = os.path.dirname(__file__)
-
-import sys
-sys.path.append(os.path.join(MYDIR, "../General/"))
-import common
+import FFPE.Util.common as common
 
 FILE_HEADER = b"NEWARE"
 YEAR_SLEN, MONTH_SLEN, DAY_SLEN = 4, 2, 2

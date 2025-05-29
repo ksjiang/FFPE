@@ -1,24 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Aug 28 11:23:15 2023
 
-@author: Kyle
-"""
-
-# imports
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import time
 import ctypes
-import os
-
-# this directory
-MYDIR = os.path.dirname(__file__)
-
-import sys
-sys.path.append(os.path.join(MYDIR, "../General/"))
-import common
+import FFPE.Util.common as common
 
 DATE_SIZE = 8
 MODULE_SN_SIZE = 10

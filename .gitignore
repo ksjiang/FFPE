@@ -1,16 +1,3 @@
 
-# by default, ignore everything
-/*
-# additionally, ignore compiled Python bytecode files
+# ignore compiled Python bytecode files
 **/__pycache__
-
-# myself
-!/.gitignore
-
-# readme
-!/README.md
-
-# folders
-!/General/
-!/Biologic/
-!/Neware/
