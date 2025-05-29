@@ -8,10 +8,17 @@ Created on Mon Aug 28 18:24:01 2023
 # imports
 import os
 import struct
-from matplotlib.patches import Rectangle, Wedge
 import colorsys
 import numpy as np
 import scipy.integrate
+import scipy.sparse
+
+from matplotlib.patches import Rectangle, Wedge, Circle, RegularPolygon
+from matplotlib.path import Path
+from matplotlib.projections.polar import PolarAxes
+from matplotlib.projections import register_projection
+from matplotlib.spines import Spine
+from matplotlib.transforms import Affine2D
 
 # sizes of data types
 BYTE_SIZE = 1
@@ -66,6 +73,9 @@ def deviation(l):
         return np.abs(l[0] - l[1]) / 2.
     
     return NAN
+
+def rangeOf(l):
+    return (min(l), max(l))
 
 # a pointer object that can be used to keep track of position within a data block
 class pointer(object):
@@ -187,13 +197,19 @@ CBAR_STANDALONE_PAD = 45
 CBAR_TEXT_SIZE = 40
 ROT_FACE_LEFT = 270
 ROT_LABEL_DOWNRIGHT = -45
+ROT_LABEL_DOWN = -90
 MARKER_SIZE = 9
 MARKER_WIDTH_HOLLOW = 2
 MARKER_DISK = 'o'
 MARKER_CROSS = '+'
 ERRORBAR_SIZE = 5
+
+LIGHT_GREY = (0.85, 0.85, 0.85)
+GREY = (0.5, 0.5, 0.5)
+DARK_GREY = (0.25, 0.25, 0.25)
 GREY_PATCH = (0.5, 0.5, 0.5, 0.5)
 LIGHT_GREY_PATCH = (0.85, 0.85, 0.85, 0.5)
+ULTRALIGHT_GREY_PATCH = (0.95, 0.95, 0.95, 0.5)
 MARKER_WIDTH_SERIES_LIMS = (1, 3)
 GREYSCALE_SERIES_LIMS = (0.7, 0.2)
 HISTOGRAM_BAR_EDGEWIDTH = 1.0
@@ -255,6 +271,27 @@ def drawErrorBounds(ax, xpos, bottomcent, topcent, width = PATCH_WIDTH, patch_co
     ax.add_patch(Wedge((xpos, bottomcent), width / 2, 180, 360, fill = True, color = patch_color, linewidth = 0))
     return
 
+# for parsing duration strings of the form HH:MM:SS
+def duration_str_to_seconds(duration_str):
+    h, m, s = map(int, duration_str.split(':'))
+    total_seconds = 3600 * h + 60 * m + s
+    return total_seconds
+
+vectorized_duration_str_to_seconds = np.vectorize(duration_str_to_seconds)
+
+# reference: P.H.C. Eilers, H.F.M. Boelens. "Baseline Correction with Asymmetric Least Squares Smoothing" (2005)
+def baseline_als(y, lam = 1E5, p = 0.01, niter = 10):
+    L = y.shape[0]
+    D = scipy.sparse.csc_matrix(np.diff(np.eye(L), 2))
+    w = np.ones(L)
+    for i in range(niter):
+        W = scipy.sparse.spdiags(w, 0, L, L)
+        Z = W + lam * D.dot(D.transpose())
+        z = scipy.sparse.linalg.spsolve(Z, w * y)
+        w = p * (y > z) + (1 - p) * (y < z)
+        
+    return z
+
 def Integrate(y, x, xleft, xright):
     mask = (x > xleft) & (x < xright)
     return scipy.integrate.simps(y[mask], x[mask])
@@ -288,3 +325,91 @@ def createTicks(left_bound, right_bound, step):
 def scale_lightness(color_rgb, scale_l):
     h, l, s = colorsys.rgb_to_hls(*color_rgb)
     return colorsys.hls_to_rgb(h, min(1, l * scale_l), s)
+
+def radar_factory(num_vars, frame = 'circle'):
+    """
+    Create a radar chart with `num_vars` axes.
+
+    This function creates a RadarAxes projection and registers it.
+    
+    Source: matplotlib radar chart demo
+
+    Parameters
+    --------
+    num_vars : int
+        Number of variables for radar chart.
+    frame : {'circle' | 'polygon'}
+        Shape of frame surrounding axes.
+
+    Returns
+    --------
+    numpy.array
+        Angular positions of the spokes.
+        
+    """
+    # calculate evenly-spaced axis angles
+    theta = np.linspace(0, 2 * np.pi, num_vars, endpoint = False)
+    class RadarAxes(PolarAxes):
+        name = "radar"
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # rotate plot such that the first axis is at the top
+            self.set_theta_zero_location('N')
+
+        def fill(self, *args, closed = True, **kwargs):
+            """Override fill so that line is closed by default"""
+            return super().fill(closed = closed, *args, **kwargs)
+
+        def plot(self, *args, closed = True, **kwargs):
+            """Override plot so that line is closed by default"""
+            lines = super().plot(*args, **kwargs)
+            if closed:
+                for line in lines:
+                    self._close_line(line)
+                    
+        def _close_line(self, line):
+            x, y = line.get_data()
+            if x[0] != x[-1]:
+                x = np.concatenate((x, [x[0]]))
+                y = np.concatenate((y, [y[0]]))
+                line.set_data(x, y)
+                
+        def set_varlabels(self, labels, **kwargs):
+            self.set_thetagrids(np.degrees(theta), labels, **kwargs)
+            
+        def _gen_axes_patch(self):
+            # The Axes patch must be centered at (0.5, 0.5) and of radius 0.5
+            # in axes coordinates.
+            if frame == "circle":
+                return Circle((0.5, 0.5), 0.5)
+            elif frame == "polygon":
+                return RegularPolygon((0.5, 0.5), num_vars, radius = .5, edgecolor = "k")
+            else:
+                raise ValueError("unknown value for 'frame': %s" % (frame))
+                
+        def draw(self, renderer):
+            """ Draw. If frame is polygon, make gridlines polygon-shaped """
+            if frame == "polygon":
+                gridlines = self.yaxis.get_gridlines()
+                for gl in gridlines:
+                    gl.get_path()._interpolation_steps = num_vars
+                    
+            super().draw(renderer)
+            
+        def _gen_axes_spines(self):
+            if frame == "circle":
+                return super()._gen_axes_spines()
+            elif frame == "polygon":
+                # spine_type must be 'left'/'right'/'top'/'bottom'/'circle'.
+                spine = Spine(axes = self, spine_type = 'circle', path = Path.unit_regular_polygon(num_vars))
+                # unit_regular_polygon gives a polygon of radius 1 centered at
+                # (0, 0) but we want a polygon of radius 0.5 centered at (0.5,
+                # 0.5) in axes coordinates.
+                spine.set_transform(Affine2D().scale(0.5).translate(0.5, 0.5) + self.transAxes)
+                
+                return {"polar": spine}
+            else:
+                raise ValueError("unknown value for 'frame': %s" % frame)
+                
+    register_projection(RadarAxes)
+    return theta

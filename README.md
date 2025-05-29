@@ -5,18 +5,16 @@ VMPff is a collection of **parsers** for binary data written by electrochemical 
 
 ## Usage
 
-No installation is needed. Simply `git clone https://github.com/ksjiang/VMPff <PATH TO VMPff>`. If you are interested in obtaining the full data in a file in a dataframe, import `<INSTRUMENT>/cycle_metrics` and instantiate a experiment object. For example, to extract the data from a Biologic MPR file, you can use
+No installation is needed. Simply `git clone https://github.com/ksjiang/VMPff <PATH TO VMPff>`. If you are interested in exporting the full data in a file to a dataframe, import `<INSTRUMENT>.cycle_metrics` and instantiate an experiment object. For example, to extract the data from a Biologic MPR file, you can use
 
-    import sys
-    sys.path.append("<PATH TO VMPff>/Biologic Parser")
-    import cycle_metrics
+    import Biologic.cycle_metrics
 
-    experiment = cycle_metrics.BiologicExperiment()
+    experiment = Biologic.cycle_metrics.BiologicExperiment()
     experiment.fromFile("<PATH TO MPR FILE>")
     
 Then, the extracted data is available in `experiment.measurement_sequence`.
 
-Usually, it is desirable to interpret the data in some way, depending on the specific experiment it is from. For this, more information about the experiment is needed. Information about experiments can be organized as classes in an instrument-agnostic manner in `General/cycle_tools.py`.
+Usually, it is desirable to interpret the data in some way, depending on the specific experiment it is from. For this, more information about the experiment is needed. Such information can be organized as classes in an instrument-agnostic manner in `General/cycle_tools.py`.
 
 ### Galvanostatic Experiments
 
