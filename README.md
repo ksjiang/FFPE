@@ -9,11 +9,11 @@ Simply run `pip install git+https://github.com/ksjiang/FFPE.git@v0.0.1`.
 
 ## Usage
 
-If you are interested in exporting the full data in a file to a dataframe, import `FFPE.<INSTRUMENT>.cycle_metrics` and instantiate an experiment object. For example, to extract the data from a Biologic MPR file, you can use
+If you are interested in exporting the full data in a file to a dataframe, import `FFPE.<INSTRUMENT>.cycle_metrics` and instantiate an experiment object. For example, to extract the data from a BioLogic MPR file, you can use
 
-    import FFPE.Biologic.cycle_metrics
+    import FFPE.BioLogic.cycle_metrics
 
-    experiment = FFPE.Biologic.cycle_metrics.BiologicExperiment()
+    experiment = FFPE.BioLogic.cycle_metrics.BiologicExperiment()
     experiment.fromFile("<PATH TO MPR FILE>")
     
 Then, the extracted data is available in `experiment.measurement_sequence`.
