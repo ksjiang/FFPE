@@ -1,9 +1,16 @@
 
+"""
+# Biologic MPR File Parser #
+
+Defines `fromFile()`, which parses data from `.mpr` files.
+"""
+
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import time
 import ctypes
+
 import FFPE.Util.common as common
 
 DATE_SIZE = 8
@@ -32,46 +39,46 @@ COL_SIZE = 2
 COL_FBIT = 3
 COL_FSIZE = 4
 VMP_DATA_FIELD_LIST = {
-        1: ("mode", *common.NONE_FIELD, 0, 2), 
-        2: ("ox/red", *common.NONE_FIELD, 2, 1), 
-        3: ("error", *common.NONE_FIELD, 3, 1), 
-        4: ("time", *common.DOUBLE, *common.NONE_FIELD), 
-        5: ("control I", *common.SINGLE, *common.NONE_FIELD), 
-        6: ("Ewe", *common.SINGLE, *common.NONE_FIELD), 
-        7: ("dq", *common.DOUBLE, *common.NONE_FIELD), 
-        8: ("I", *common.SINGLE, *common.NONE_FIELD), 
-        0xb: ("<I>_mA", *common.DOUBLE, *common.NONE_FIELD), 
-        0xd: ("Q-Q0", *common.DOUBLE, *common.NONE_FIELD), 
-        0x13: ("control V", *common.SINGLE, *common.NONE_FIELD), 
-        0x15: ("control change", *common.NONE_FIELD, 4, 1), 
-        0x18: ("cycle number", *common.DOUBLE, *common.NONE_FIELD), 
-        0x1f: ("Ns change", *common.NONE_FIELD, 5, 1), 
-        0x20: ("freq", *common.SINGLE, *common.NONE_FIELD), 
-        0x21: ("|Ewe|", *common.SINGLE, *common.NONE_FIELD), 
-        0x22: ("|I|", *common.SINGLE, *common.NONE_FIELD), 
-        0x23: ("angle(Z)", *common.SINGLE, *common.NONE_FIELD), 
-        0x24: ("|Z|", *common.SINGLE, *common.NONE_FIELD), 
-        0x25: ("Re(Z)", *common.SINGLE, *common.NONE_FIELD), 
-        0x26: ("-Im(Z)", *common.SINGLE, *common.NONE_FIELD), 
-        0x27: ("I range", *common.UINT16, *common.NONE_FIELD), 
-        0x41: ("counter change", *common.NONE_FIELD, 7, 1), 
-        0x4a: ("Energy", *common.DOUBLE, *common.NONE_FIELD), 
-        0x46: ("P", *common.SINGLE, *common.NONE_FIELD), 
-        0x4c: ("<I>", *common.SINGLE, *common.NONE_FIELD), 
-        0x4d: ("<Ewe>", *common.SINGLE, *common.NONE_FIELD), 
-        0x7b: ("Energy charge", *common.DOUBLE, *common.NONE_FIELD), 
-        0x7c: ("Energy discharge", *common.DOUBLE, *common.NONE_FIELD), 
-        0x7d: ("Capacitance charge", *common.DOUBLE, *common.NONE_FIELD), 
-        0x7e: ("Capacitance discharge", *common.DOUBLE, *common.NONE_FIELD), 
-        0x83: ("Ns", *common.UINT16, *common.NONE_FIELD), 
-        0xa9: ("Cs", *common.SINGLE, *common.NONE_FIELD), 
-        0xac: ("Cp", *common.SINGLE, *common.NONE_FIELD), 
-        0x1b2: ("(Q-Q0)_C", *common.SINGLE, *common.NONE_FIELD), 
-        0x1b6: ("Step time", *common.DOUBLE, *common.NONE_FIELD), 
-        0x1d3: ("Q charge/discharge", *common.DOUBLE, *common.NONE_FIELD), 
-        0x1d4: ("half cycle", *common.UINT32, *common.NONE_FIELD), 
-        0x1d5: ("Z cycle", *common.UINT32, *common.NONE_FIELD), 
-        }
+    1: ("mode", *common.NONE_FIELD, 0, 2), 
+    2: ("ox/red", *common.NONE_FIELD, 2, 1), 
+    3: ("error", *common.NONE_FIELD, 3, 1), 
+    4: ("time", *common.DOUBLE, *common.NONE_FIELD), 
+    5: ("control I", *common.SINGLE, *common.NONE_FIELD), 
+    6: ("Ewe", *common.SINGLE, *common.NONE_FIELD), 
+    7: ("dq", *common.DOUBLE, *common.NONE_FIELD), 
+    8: ("I", *common.SINGLE, *common.NONE_FIELD), 
+    0xb: ("<I>_mA", *common.DOUBLE, *common.NONE_FIELD), 
+    0xd: ("Q-Q0", *common.DOUBLE, *common.NONE_FIELD), 
+    0x13: ("control V", *common.SINGLE, *common.NONE_FIELD), 
+    0x15: ("control change", *common.NONE_FIELD, 4, 1), 
+    0x18: ("cycle number", *common.DOUBLE, *common.NONE_FIELD), 
+    0x1f: ("Ns change", *common.NONE_FIELD, 5, 1), 
+    0x20: ("freq", *common.SINGLE, *common.NONE_FIELD), 
+    0x21: ("|Ewe|", *common.SINGLE, *common.NONE_FIELD), 
+    0x22: ("|I|", *common.SINGLE, *common.NONE_FIELD), 
+    0x23: ("angle(Z)", *common.SINGLE, *common.NONE_FIELD), 
+    0x24: ("|Z|", *common.SINGLE, *common.NONE_FIELD), 
+    0x25: ("Re(Z)", *common.SINGLE, *common.NONE_FIELD), 
+    0x26: ("-Im(Z)", *common.SINGLE, *common.NONE_FIELD), 
+    0x27: ("I range", *common.UINT16, *common.NONE_FIELD), 
+    0x41: ("counter change", *common.NONE_FIELD, 7, 1), 
+    0x4a: ("Energy", *common.DOUBLE, *common.NONE_FIELD), 
+    0x46: ("P", *common.SINGLE, *common.NONE_FIELD), 
+    0x4c: ("<I>", *common.SINGLE, *common.NONE_FIELD), 
+    0x4d: ("<Ewe>", *common.SINGLE, *common.NONE_FIELD), 
+    0x7b: ("Energy charge", *common.DOUBLE, *common.NONE_FIELD), 
+    0x7c: ("Energy discharge", *common.DOUBLE, *common.NONE_FIELD), 
+    0x7d: ("Capacitance charge", *common.DOUBLE, *common.NONE_FIELD), 
+    0x7e: ("Capacitance discharge", *common.DOUBLE, *common.NONE_FIELD), 
+    0x83: ("Ns", *common.UINT16, *common.NONE_FIELD), 
+    0xa9: ("Cs", *common.SINGLE, *common.NONE_FIELD), 
+    0xac: ("Cp", *common.SINGLE, *common.NONE_FIELD), 
+    0x1b2: ("(Q-Q0)_C", *common.SINGLE, *common.NONE_FIELD), 
+    0x1b6: ("Step time", *common.DOUBLE, *common.NONE_FIELD), 
+    0x1d3: ("Q charge/discharge", *common.DOUBLE, *common.NONE_FIELD), 
+    0x1d4: ("half cycle", *common.UINT32, *common.NONE_FIELD), 
+    0x1d5: ("Z cycle", *common.UINT32, *common.NONE_FIELD), 
+}
 
 REST_MODE = 3
 

@@ -1,15 +1,28 @@
 
+"""
+# Neware Experiment #
+
+Defines `NewareExperiment`, a class representing experiments recorded on Neware cyclers.
+"""
+
+import os
+
 import FFPE.Neware.NDAff as NDAff
+import FFPE.Neware.NDAXff as NDAXff
 import FFPE.Util.cycle_tools as cycle_tools
 
-# class representing experiments recorded by MTI Cycler
-class MTICycExperiment(object):
+class NewareExperiment(object):
     def __init__(self):
         return
     
     # instantiate fromFile
     def fromFile(self, fileName):
-        x1, x2, Y = NDAff.fromFile(fileName)
+        fileName_extension = os.path.splitext(fileName)[1]
+        if fileName_extension == ".nda":
+            x1, x2, Y = NDAff.fromFile(fileName)
+        elif fileName_extension == ".ndax":
+            x1, x2, Y = NDAXff.fromFile(fileName)
+        else: assert False, "Unknown file extension %s" % (fileName_extension)
         self.metadata = [x1, x2]
         self.measurement_sequence = Y
         return
@@ -26,16 +39,16 @@ class MTICycExperiment(object):
         return self.measurement_sequence.loc[self.getCycleDataIdx_hc(cycle, half_cycle, include_rest)]
     
     
-class MTICycMODE1CyclingExperiment(MTICycExperiment, cycle_tools.MODE1CyclingExperiment):
+class NewareMODE1CyclingExperiment(NewareExperiment, cycle_tools.MODE1CyclingExperiment):
     def __init__(self, area):
-        MTICycExperiment.__init__(self)
+        NewareExperiment.__init__(self)
         cycle_tools.MODE1CyclingExperiment.__init__(self, area, REST = (1, 0), CYCLE_PLATING = (2, 1), CYCLE_STRIPPING = (4, 2))
         return
     
     
-class MTICycPNNLCyclingExperiment(MTICycExperiment, cycle_tools.PNNLCyclingExperiment):
+class NewarePNNLCyclingExperiment(NewareExperiment, cycle_tools.PNNLCyclingExperiment):
     def __init__(self, area):
-        MTICycExperiment.__init__(self)
+        NewareExperiment.__init__(self)
         cycle_tools.PNNLCyclingExperiment.__init__(self, area, REST = (1, 0), INITIAL_PLATING = (2, 1), INITIAL_STRIPPING = (4, 2), TEST_PLATING = (6, 3), SHORT_CYCLE_STRIPPING = (8, 4), SHORT_CYCLE_PLATING = (10, 5), TEST_STRIPPING = (13, 24), NUM_SHORT_CYCLES = 10)
         return
     

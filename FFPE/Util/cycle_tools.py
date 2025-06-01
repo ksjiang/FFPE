@@ -1,6 +1,13 @@
 
+"""
+# Electrochemical Experiment #
+
+Defines electrochemical experiments.
+"""
+
 import numpy as np
 import pandas as pd
+
 import FFPE.Util.common as common
 
 sec2hr = lambda time_delta: time_delta / 3600.

@@ -1,13 +1,22 @@
 
+"""
+# Neware NDA File Parser #
+
+Defines `fromFile()`, which parses data from `.nda` files.
+"""
+
 import time
 import numpy as np
 import pandas as pd
+
 import FFPE.Util.common as common
+import FFPE.Util.converters as conv
+import FFPE.Neware.constants as constants
 
 FILE_HEADER = b"NEWARE"
 YEAR_SLEN, MONTH_SLEN, DAY_SLEN = 4, 2, 2
-BTS_VERSION_STRING_OFFS = 0x70
-BTS_VERSION_STRING_SLEN = 30
+NDA_VERSION_STRING_OFFS = 0x70
+NDA_VERSION_STRING_SLEN = 30
 CHANNEL_INFO_OFFS = 0x82b
 USERNAME_OFFS = 0x876
 USERNAME_LEN = 15
@@ -15,53 +24,23 @@ BATCH_LEN = 20
 MEMO_LEN = 100
 STATUS_SUCCESS = 0
 
-UA2MA = lambda x: x * 1E-3
-TMV2V = lambda x: x * 1E-4
-UW2W = lambda x: x * 1E-6
-S2HR = lambda x: x / 3600.
-UAS2MAH = lambda x: S2HR(UA2MA(x))
-UWS2WH = lambda x: S2HR(UW2W(x))
+NDA_RECORD_INFO_SPEC = [
+    ("status", np.uint8), 
+    ("record_no", np.uint32), 
+    ("cycle number", np.uint32), 
+    ("Ns", np.uint8), 
+    ("mode", np.uint8), 
+    ("step_time", np.uint32), 
+    ("Ewe", np.int32), 
+    ("current", np.int32), 
+    ("temperature", np.int64), 
+    ("Q charge/discharge", np.int64), 
+    ("Energy charge/discharge", np.int64), 
+    ("clock_time", np.uint64), 
+    ("checksum", np.uint32)
+]
 
-BTS_RECORD_INFO_SPEC = [
-        ("status", np.uint8), 
-        ("record_no", np.uint32), 
-        ("cycle number", np.uint32), 
-        ("Ns", np.uint8), 
-        ("mode", np.uint8), 
-        ("step_time", np.uint32), 
-        ("Ewe", np.int32), 
-        ("current", np.int32), 
-        ("temperature", np.int64), 
-        ("Q charge/discharge", np.int64), 
-        ("Energy charge/discharge", np.int64), 
-        ("clock_time", np.uint64), 
-        ("checksum", np.uint32)
-        ]
-
-BTS_RECORD_INFO = np.dtype(BTS_RECORD_INFO_SPEC)
-BTS_STEP_TYPES = [None, "CC_charge", "CC_discharge", None, "Rest", "Loop", "Stop"]
-
-# returns the leading edge (smaller index) of changes
-# expects numpy array, so convert using to_numpy() if using pandas
-def findStepChanges(series):
-    return np.where(np.diff(series) != 0)[0]
-
-def findHalfStepChanges(series, triggers):
-    changes = []
-    for trigger in triggers:
-        hot = np.where(series == trigger)[0]
-        leading_edge_idcs = np.where(np.diff(hot) != 1)[0] + 1
-        # subtract one to get leading edge index (don't subtract if already 0)
-        hot_leading_edges = np.maximum(0, hot[leading_edge_idcs] - 1)
-        # treat the first instance
-        # subtract one to get leading edge index (don't subtract if already 0)
-        first = max([0, hot[0] - 1])
-        if first not in hot_leading_edges:
-            hot_leading_edges = np.concatenate([[first], hot_leading_edges], axis = 0)
-            
-        changes.append(hot_leading_edges)
-        
-    return np.sort(np.concatenate(changes, axis = 0))
+NDA_RECORD_INFO = np.dtype(NDA_RECORD_INFO_SPEC)
 
 # accumulates a series by referencing step changes
 # expects numpy array
@@ -81,20 +60,6 @@ def accumulateSeriesSteps(series, change_indices):
     r[mark: ] = a + series[mark: ]
     return r
 
-def fillCount(series_size, change_indices):
-    # new series
-    r = np.zeros(series_size, dtype = int)
-    a = 0
-    mark = 0
-    for change_index in change_indices:
-        r[mark: change_index + 1] = a
-        a += 1
-        mark = change_index + 1
-        
-    # finish the series
-    r[mark: ] = a
-    return r
-
 def fromFile(fileName):
     ptr = common.pointer()
     with open(fileName, "rb") as f:
@@ -111,12 +76,12 @@ def fromFile(fileName):
     date["day"] = int(common.getRaw(contents, ptr, DAY_SLEN))
     header_info["date"] = date
     
-    ptr.setValue(BTS_VERSION_STRING_OFFS)
-    header_info["version"] = common.bytes2Cstring(common.getRaw(contents, ptr, BTS_VERSION_STRING_SLEN))
+    ptr.setValue(NDA_VERSION_STRING_OFFS)
+    header_info["sw_version"] = common.bytes2Cstring(common.getRaw(contents, ptr, NDA_VERSION_STRING_SLEN))
     
     ptr.setValue(CHANNEL_INFO_OFFS)
     header_info["machine"] = common.getField(contents, ptr, *common.UINT8)
-    header_info["version"] = common.getField(contents, ptr, *common.UINT8)
+    header_info["hw_version"] = common.getField(contents, ptr, *common.UINT8)
     
     ptr.setValue(USERNAME_OFFS)
     header_info["username"] = common.bytes2Cstring(common.getRaw(contents, ptr, USERNAME_LEN))
@@ -139,12 +104,12 @@ def fromFile(fileName):
         ptr.add(common.UINT8[1])
         step_info["Ns"] = step_id
         step_type = common.getField(contents, ptr, *common.UINT8)
-        assert step_type < len(BTS_STEP_TYPES) and BTS_STEP_TYPES[step_type] is not None, "Unrecognized step type"
-        step_info["mode"] = BTS_STEP_TYPES[step_type]
+        assert step_type < len(constants.STEP_TYPES) and constants.STEP_TYPES[step_type] is not None, "Unrecognized step type"
+        step_info["mode"] = constants.STEP_TYPES[step_type]
         if step_info["mode"] in ["CC_charge", "CC_discharge"]:
-            step_info["current"] = UA2MA(common.getField(contents, ptr, *common.INT32))
+            step_info["current"] = conv.UA2MA(common.getField(contents, ptr, *common.INT32))
             step_info["time"] = common.getField(contents, ptr, *common.INT32)
-            step_info["voltage"] = TMV2V(common.getField(contents, ptr, *common.INT32))
+            step_info["voltage"] = conv.TMV2V(common.getField(contents, ptr, *common.INT32))
             ptr.add(2 * common.INT32[1])
         elif step_info["mode"] == "Rest":
             step_info["time"] = common.getField(contents, ptr, *common.INT32)
@@ -164,19 +129,19 @@ def fromFile(fileName):
     # the pointer object holds the offset to the data records
     # use numpy frombuffer with this offset to efficiently extract data
     startTime = time.perf_counter()
-    data = np.frombuffer(contents, dtype = BTS_RECORD_INFO, offset = ptr.getValue())
-    dataframe = pd.DataFrame(data = data, columns = [_[0] for _ in BTS_RECORD_INFO_SPEC])
+    data = np.frombuffer(contents, dtype = NDA_RECORD_INFO, offset = ptr.getValue())
+    dataframe = pd.DataFrame(data = data, columns = [_[0] for _ in NDA_RECORD_INFO_SPEC])
     # perform conversions on some of the columns
     # change type of step_time to float
     dataframe["step_time"] = dataframe["step_time"].astype(float)
     # convert voltage from tenths of mV to V
-    dataframe["Ewe"] = TMV2V(dataframe["Ewe"].astype(float))
+    dataframe["Ewe"] = conv.TMV2V(dataframe["Ewe"].astype(float))
     # convert current from uA to mA
-    dataframe["current"] = UA2MA(dataframe["current"].astype(float))
+    dataframe["current"] = conv.UA2MA(dataframe["current"].astype(float))
     # convert capacity from uAs to mAh
-    dataframe["Q charge/discharge"] = UAS2MAH(dataframe["Q charge/discharge"].astype(float))
+    dataframe["Q charge/discharge"] = conv.UAS2MAH(dataframe["Q charge/discharge"].astype(float))
     # convert energy from uWs to Wh
-    dataframe["Energy charge/discharge"] = UWS2WH(dataframe["Energy charge/discharge"].astype(float))
+    dataframe["Energy charge/discharge"] = conv.UWS2WH(dataframe["Energy charge/discharge"].astype(float))
     # wish there was a way to verify the checksum, but for now just delete it
     del dataframe["checksum"]
     
@@ -185,14 +150,13 @@ def fromFile(fileName):
     finishTime = time.perf_counter()
     common.printElapsedTime("Parse", startTime, finishTime)
     
-    # now, we accumulate some variables, such as time and charge
-    # referenced to the beginning of the experiment
-    # find the rows where the step changes (leading edge)
-    step_changes = findStepChanges(np.array(dataframe["Ns"]))
-    # find where the current changes direction (occurs less frequently than step_changes)
-    half_step_changes = findHalfStepChanges(np.array(dataframe["mode"]), (BTS_STEP_TYPES.index("CC_discharge"), BTS_STEP_TYPES.index("CC_charge")))
-    dataframe["half cycle"] = fillCount(len(dataframe["Ns"]), half_step_changes)
+    # now, we accumulate some variables, such as time and charge referenced to the beginning of the experiment
+    # find step changes
+    step_changes = constants.findStepChanges(np.array(dataframe["Ns"]))
+    # find half cycle changes
+    hc_changes = np.concatenate(([-1], constants.findHalfCycleChanges(np.array(dataframe["mode"]))), axis = 0)
+    dataframe["half cycle"] = constants.convertIndices(np.arange(len(dataframe["Ns"])), hc_changes)
     dataframe["time"] = accumulateSeriesSteps(np.array(dataframe["step_time"]), step_changes)
-    dataframe["Q-Q0"] = accumulateSeriesSteps(np.array(dataframe["Q charge/discharge"]) * np.where(np.array(dataframe["mode"]) == BTS_STEP_TYPES.index("CC_discharge"), -1, 1), step_changes)
+    dataframe["Q-Q0"] = accumulateSeriesSteps(np.array(dataframe["Q charge/discharge"]) * np.where(np.array(dataframe["mode"]) == constants.STEP_TYPES.index("CC_discharge"), -1, 1), step_changes)
     
     return header_info, step_infos, dataframe

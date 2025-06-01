@@ -1,4 +1,10 @@
 
+"""
+# Common Utilities #
+
+Useful type definitions and functions for wading through binary data.
+"""
+
 # imports
 import os
 import struct
@@ -27,13 +33,13 @@ DOUBLE_BE = (">d", LLONG_SIZE)
 
 # numpy equivalent types
 NP_TYPES = {
-        SINGLE[FMT_SPEC]: np.float32, 
-        DOUBLE[FMT_SPEC]: np.float64, 
-        UINT8[FMT_SPEC]: np.uint8, 
-        UINT16[FMT_SPEC]: np.uint16,
-        UINT32[FMT_SPEC]: np.uint32, 
-        INT32[FMT_SPEC]: np.int32, 
-        }
+    SINGLE[FMT_SPEC]: np.float32, 
+    DOUBLE[FMT_SPEC]: np.float64, 
+    UINT8[FMT_SPEC]: np.uint8, 
+    UINT16[FMT_SPEC]: np.uint16,
+    UINT32[FMT_SPEC]: np.uint32, 
+    INT32[FMT_SPEC]: np.int32, 
+}
 
 # to denote an empty byte or bit field
 NONE_FIELD = (None, None)
