@@ -141,10 +141,8 @@ def getBitFieldsStridedFlatShared(ptrVal, blk, N, bitPos, fieldSize):
     return getBitFieldsStridedFlat(mySharedData, ptrVal, blk, N, bitPos, fieldSize)
 
 def ternary(condition, valueIfTrue, valueIfFalse):
-    if condition:
-        return valueIfTrue
-    else:
-        return valueIfFalse
+    if condition: return valueIfTrue
+    else: return valueIfFalse
 
 def intersperse(l, item):
     r = [item] * (2 * len(l) - 1)
@@ -175,3 +173,102 @@ def createOutputFileName(inputFiles, suffix, extension = None):
 def printElapsedTime(tag, start, finish):
     print("%s finished in %0.6f s" % (tag, finish - start))
     return
+
+# operations on numpy arrays
+def findStepChanges(step_series):
+    """
+    Finds the indices at which new steps occur. Note that index 0 is always considered to be a step change.
+
+    Parameters
+    --------
+    step_series : numpy.ndarray
+        An array containing step type numbers
+
+    Returns
+    --------
+    numpy.ndarray
+        An array containing the indices of the step changes
+
+    """
+    return np.concatenate(([0], np.where(np.diff(step_series) != 0)[0] + 1), axis = 0)
+
+def convertStepToGlobal(arr, change_idcs):
+    """
+    Given an array of values `arr` that are referenced to a step, computes values referenced to the beginning of the experiment. The indices of the first point in each step is given in `change_indices`.
+
+    Parameters
+    --------
+    arr : numpy.ndarray
+        An array containing values referenced to the step
+    
+    change_indices : numpy.ndarray
+        The indices at which steps begin
+
+    Returns
+    --------
+    numpy.ndarray
+        Array of values referenced to the beginning of the experiment
+
+    """
+    # the size of the data
+    N = arr.shape[0]
+    # the size of the number of steps
+    n = change_idcs.shape[0]
+    # compute the indices of the steps just before step changes
+    # these are important because they contain the values we will accumulate
+    prestep_indices = change_idcs - 1
+    # get the final relative value for each step
+    step_finals = np.zeros(n)
+    valid_prestep_indices_mask = prestep_indices >= 0
+    step_finals[valid_prestep_indices_mask] = arr[prestep_indices[valid_prestep_indices_mask]]
+    # compute the global values at the beginning of each step by performing cumulative sum over final values
+    step_globals = np.cumsum(step_finals)
+    # compute the step indices for the array
+    step_indices = convertIndices(np.arange(N), change_idcs)
+    return step_globals[step_indices] + arr
+
+def convertIndices(arr, change_idcs):
+    """
+    Computes the step indices of the corresponding global indices in `arr`, where the global indices of step changes are specified in the argument `change_idcs`. For this function to work properly, ensure that all elements of `arr` are greater than or equal to some element in `change_idcs`.
+
+    Parameters
+    --------
+    arr : numpy.ndarray
+        An array containing global indices
+
+    change_idcs : numpy.ndarray
+        An array containing the global indices of step changes
+
+    Returns
+    --------
+    numpy.ndarray
+        An array of step indices
+
+    """
+    return np.searchsorted(change_idcs, arr, side = "right") - 1
+
+def findSegmentChanges(arr, triggers):
+    """
+    Finds the indices at which new segments occur. The names of the step type numbers that trigger a segment change should be specified in the `triggers` argument. Since the first segment need not begin at index 0, the returned array always starts with -1 so that the result can easily be used with other functions.
+
+    Parameters
+    --------
+    arr : numpy.ndarray
+        An array containing step type numbers
+
+    triggers : numpy.ndarray
+        An array of step type numbers that should trigger a segment change
+
+    Returns
+    --------
+    numpy.ndarray
+        An array containing the indices of the segment changes
+
+    """
+    changes = [[-1]]
+    for trigger in triggers:
+        hot_indices = np.where(arr == trigger)[0]
+        hot_indices_diff = np.diff(np.concatenate(([-1], hot_indices), axis = 0))
+        changes.append(hot_indices[np.where(hot_indices_diff != 1)[0]])
+
+    return np.sort(np.concatenate(changes, axis = 0))

@@ -42,24 +42,6 @@ NDA_RECORD_INFO_SPEC = [
 
 NDA_RECORD_INFO = np.dtype(NDA_RECORD_INFO_SPEC)
 
-# accumulates a series by referencing step changes
-# expects numpy array
-def accumulateSeriesSteps(series, change_indices):
-    # new series
-    r = np.zeros(len(series))
-    # accumulator and mark
-    a = 0.
-    mark = 0
-    for change_index in change_indices:
-        r[mark: change_index + 1] = a + series[mark: change_index + 1]
-        # update accumulator and mark
-        a += series[change_index]
-        mark = change_index + 1
-        
-    # finish the series
-    r[mark: ] = a + series[mark: ]
-    return r
-
 def fromFile(fileName):
     ptr = common.pointer()
     with open(fileName, "rb") as f:
@@ -152,11 +134,16 @@ def fromFile(fileName):
     
     # now, we accumulate some variables, such as time and charge referenced to the beginning of the experiment
     # find step changes
-    step_changes = constants.findStepChanges(np.array(dataframe["Ns"]))
+    step_changes = common.findStepChanges(np.array(dataframe["Ns"]))
     # find half cycle changes
-    hc_changes = np.concatenate(([-1], constants.findHalfCycleChanges(np.array(dataframe["mode"]))), axis = 0)
-    dataframe["half cycle"] = constants.convertIndices(np.arange(len(dataframe["Ns"])), hc_changes)
-    dataframe["time"] = accumulateSeriesSteps(np.array(dataframe["step_time"]), step_changes)
-    dataframe["Q-Q0"] = accumulateSeriesSteps(np.array(dataframe["Q charge/discharge"]) * np.where(np.array(dataframe["mode"]) == constants.STEP_TYPES.index("CC_discharge"), -1, 1), step_changes)
+    hc_changes = common.findSegmentChanges(np.array(dataframe["mode"]), constants.HALF_STEP_TRIGGER_STEP_NUMS)
+    dataframe["half cycle"] = common.convertIndices(np.arange(len(dataframe["Ns"])), hc_changes)
+    # elapsed time relative to beginning of experiment
+    dataframe["time"] = common.convertStepToGlobal(np.array(dataframe["step_time"]), step_changes)
+    # charge relative to beginning of experiment
+    # the sign of the current (used to determine sign of relative charge difference)
+    sgn_current = np.where(np.isin(np.array(dataframe["mode"]), constants.DISCHARGE_STEP_NUMS), -1, 1)
+    signed_Qstep = sgn_current * np.array(dataframe["Q charge/discharge"])
+    dataframe["Q-Q0"] = common.convertStepToGlobal(signed_Qstep, step_changes)
     
     return header_info, step_infos, dataframe

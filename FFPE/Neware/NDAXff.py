@@ -226,37 +226,30 @@ def fromFile(fileName):
         dataframe = pd.DataFrame(data = data_data, columns = [field[0] for field in NDAX_DATA_INFO_SPEC])
         # voltage should be converted
         # current is already in mA - no need to convert
-        dataframe["Ewe"] = conv.TMV2V(dataframe["Ewe"])
+        dataframe["Ewe"] = conv.TMV2V(np.array(dataframe["Ewe"]))
         # for the other tracked variables, we need to interpolate
         # the interpolant is just the record number
         dataframe["record_no"] = np.arange(1, data_data.shape[0] + 1, dtype = int)
         # step time
         step_data["start_time"] = conv.MS2S(step_data["start_time"])
-        dataframe["step_time"] = conv.MS2S(np.interp(dataframe["record_no"], run_data["record_no"], run_data["step_time"]))
+        dataframe["step_time"] = conv.MS2S(np.interp(np.array(dataframe["record_no"]), run_data["record_no"], run_data["step_time"]))
         # charge
-        dataframe["Q charge"] = conv.MAS2MAH(np.interp(dataframe["record_no"], run_data["record_no"], run_data["Q charge"]))
-        dataframe["Q discharge"] = conv.MAS2MAH(np.interp(dataframe["record_no"], run_data["record_no"], run_data["Q discharge"]))
+        dataframe["Q charge"] = conv.MAS2MAH(np.interp(np.array(dataframe["record_no"]), run_data["record_no"], run_data["Q charge"]))
+        dataframe["Q discharge"] = conv.MAS2MAH(np.interp(np.array(dataframe["record_no"]), run_data["record_no"], run_data["Q discharge"]))
         # energy
-        dataframe["Energy charge"] = conv.MWS2WH(np.interp(dataframe["record_no"], run_data["record_no"], run_data["Energy charge"]))
-        dataframe["Energy discharge"] = conv.MWS2WH(np.interp(dataframe["record_no"], run_data["record_no"], run_data["Energy discharge"]))
+        dataframe["Energy charge"] = conv.MWS2WH(np.interp(np.array(dataframe["record_no"]), run_data["record_no"], run_data["Energy charge"]))
+        dataframe["Energy discharge"] = conv.MWS2WH(np.interp(np.array(dataframe["record_no"]), run_data["record_no"], run_data["Energy discharge"]))
         # locate the step changes to find Ns and half cycle for each record; it will also come in handy for calculating the global time
-        assert step_data["start_record_no"][0] == 1, "There are records that do not belong to any step"
-        data_step_indices = constants.convertIndices(dataframe["record_no"], step_data["start_record_no"])
+        assert step_data["start_record_no"][0] == 1, "The first step has a starting reocrd number of %d, which is invalid (it should be 1)." % (step_data["start_record_no"][0])
+        data_step_indices = common.convertIndices(np.array(dataframe["record_no"]), step_data["start_record_no"])
         dataframe["Ns"] = step_data["Ns"][data_step_indices]
-        # global elapsed time relative to beginning of experiment
-        dataframe["time"] = step_data["start_time"][data_step_indices] + dataframe["step_time"]
-        # the step information does not include an equivalent "start charge", but we can easily calculate this by looking at the record just before the step
-        # if the index is -1, it means the step is the beginning of the experiment
-        # the conversion to type `int` is necessary because otherwise we will get a large positive index instead of -1
-        prestep_indices = step_data["start_record_no"].astype(int) - 2
-        qnets = dataframe["Q charge"] - dataframe["Q discharge"]
-        final_qnets = np.zeros(step_data.shape[0])
-        final_qnets[prestep_indices >= 0] = qnets[prestep_indices[prestep_indices >= 0]]
-        start_qq0 = np.cumsum(final_qnets)
-        dataframe["Q-Q0"] = start_qq0[data_step_indices] + qnets
+        # elapsed time relative to beginning of experiment
+        dataframe["time"] = step_data["start_time"][data_step_indices] + np.array(dataframe["step_time"])
+        # charge relative to beginning of experiment
+        dataframe["Q-Q0"] = common.convertStepToGlobal(np.array(dataframe["Q charge"]) - np.array(dataframe["Q discharge"]), step_data["start_record_no"].astype(int) - 1)      #in the "change_idcs" argument, subtract one to get indices instead of record numbers (which are 1-indexed)
         # find half cycle numbers (indices into step_data)
-        hc_changes = np.concatenate(([-1], constants.findHalfCycleChanges(step_data["mode"])), axis = 0)
-        dataframe["half cycle"] = constants.convertIndices(np.arange(step_data.shape[0]), hc_changes)[data_step_indices]
+        hc_changes = common.findSegmentChanges(step_data["mode"], constants.HALF_STEP_TRIGGER_STEP_NUMS)
+        dataframe["half cycle"] = common.convertIndices(np.arange(step_data.shape[0]), hc_changes)[data_step_indices]
         finishTime = time.perf_counter()
         common.printElapsedTime("Parse", startTime, finishTime)
 
