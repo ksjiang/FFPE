@@ -24,16 +24,16 @@ class BiologicExperiment(object):
         self.measurement_sequence = y.getDataFrame(mp = "Vec")
         return
     
-    def getCycleDataIdx_hc(self, cycle, half_cycle, include_rest):
+    def getCycleDataIdx_hc(self, step_num, half_cycle, include_rest):
         if include_rest:
-            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == cycle) & (self.measurement_sequence["half cycle"] == self.hc + half_cycle)].index
+            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == step_num) & (self.measurement_sequence["half cycle"] == self.hc + half_cycle)].index
         else:
-            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == cycle) & (self.measurement_sequence["half cycle"] == self.hc + half_cycle) & (self.measurement_sequence["mode"] != MPRff.REST_MODE)].index
+            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == step_num) & (self.measurement_sequence["half cycle"] == self.hc + half_cycle) & (self.measurement_sequence["mode"] != MPRff.REST_MODE)].index
             
         return indices
     
-    def getCycleData_hc(self, cycle, half_cycle, include_rest):
-        return self.measurement_sequence.loc[self.getCycleDataIdx_hc(cycle, half_cycle, include_rest)]
+    def getCycleData_hc(self, step_num, half_cycle, include_rest):
+        return self.measurement_sequence.loc[self.getCycleDataIdx_hc(step_num, half_cycle, include_rest)]
     
     
 class BiologicMODE1CyclingExperiment(BiologicExperiment, cycle_tools.MODE1CyclingExperiment):

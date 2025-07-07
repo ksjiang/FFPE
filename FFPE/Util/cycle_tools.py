@@ -98,11 +98,11 @@ class GalvanostaticCyclingExperiment(object):
     
     # this is NOT DEFINED here. it depends on the instrument used to collect the data
     # so we defer to the child class to inherit this method from an instrument experiment parent class
-    def getCycleData_hc(self, cycle, half_cycle, include_rest):
+    def getCycleData_hc(self, step_num, half_cycle, include_rest):
         raise NotImplementedError
         
-    def VvsT_hc(self, cycle, half_cycle, relative = False, include_rest = False, Vcutoff = None):
-        cycleData = self.getCycleData_hc(cycle, half_cycle, include_rest = include_rest)
+    def VvsT_hc(self, step_num, half_cycle, relative = False, include_rest = False, Vcutoff = None):
+        cycleData = self.getCycleData_hc(step_num, half_cycle, include_rest = include_rest)
         t, V = np.array(cycleData["time"]), np.array(cycleData["Ewe"])
         if Vcutoff is not None:
             firstCrossing = self.thresholdIdx(V, *Vcutoff)
@@ -118,8 +118,8 @@ class GalvanostaticCyclingExperiment(object):
                 "voltage": V, 
                 })
     
-    def VvsCapacity_hc(self, cycle, half_cycle, relative = True, rectify = True, include_rest = False, Vcutoff = None):
-        cycleData = self.getCycleData_hc(cycle, half_cycle, include_rest = include_rest)
+    def VvsCapacity_hc(self, step_num, half_cycle, relative = True, rectify = True, include_rest = False, Vcutoff = None):
+        cycleData = self.getCycleData_hc(step_num, half_cycle, include_rest = include_rest)
         Q, V = np.array(cycleData["Q-Q0"]), np.array(cycleData["Ewe"])
         if Vcutoff is not None:
             firstCrossing = self.thresholdIdx(V, *Vcutoff)
@@ -147,8 +147,9 @@ class MODE1CyclingExperiment(GalvanostaticCyclingExperiment):
         return
     
     # default behavior is to get all data after the rest step
-    def getTimeSeries(self):
-        return self.getVvsTAfterStep(step_id = self.REST[0])
+    def getTimeSeries(self, include_rest = False):
+        si = self.REST[0] if not include_rest else None
+        return self.getVvsTAfterStep(step_id = si)
     
     # definition of Coulombic efficiency for constant-capacity cycling
     def calculate_CE(self):
@@ -182,8 +183,9 @@ class PNNLCyclingExperiment(GalvanostaticCyclingExperiment):
         self.NUM_SHORT_CYCLES = NUM_SHORT_CYCLES
         return
     
-    def getTimeSeries(self):
-        return self.getVvsTAfterStep(step_id = self.REST[0])
+    def getTimeSeries(self, include_rest = False):
+        si = self.REST[0] if not include_rest else None
+        return self.getVvsTAfterStep(step_id = si)
     
     def calculate_CE(self):
         # calculate initial cycle CE
@@ -215,4 +217,111 @@ class PNNLCyclingExperiment(GalvanostaticCyclingExperiment):
         testCE = sum(stripping_caps) / sum(plating_caps)
         return initialCE, testCE
     
+    
+class FormationCyclingExperiment(GalvanostaticCyclingExperiment):
+    def __init__(self, area, REST, FORMATION_CHARGE, FORMATION_DISCHARGE, NUM_FORMATION_CYCLES, CYCLE_CHARGE, CYCLE_DISCHARGE):
+        GalvanostaticCyclingExperiment.__init__(self, area)
+        self.REST = REST
+        self.FORMATION_CHARGE = FORMATION_CHARGE
+        self.FORMATION_DISCHARGE = FORMATION_DISCHARGE
+        self.NUM_FORMATION_CYCLES = NUM_FORMATION_CYCLES
+        self.CYCLE_CHARGE = CYCLE_CHARGE
+        self.CYCLE_DISCHARGE = CYCLE_DISCHARGE
+        return
+    
+    def getTimeSeries(self, include_rest = False):
+        si = self.REST[0] if not include_rest else None
+        return self.getVvsTAfterStep(step_id = si)
+    
+    def process_formation_cycles(self):
+        """
+        Extracts and processes information pertaining to the formation cycles.
+
+        Parameters
+        --------
+
+        Returns
+        --------
+        pandas.Series
+            A series containing 5 elements, described below.
+
+                `formation_cycles_separate` : pandas.DataFrame
+                    The voltage-vs-capacity dataframes for each half formation cycle, separated
+
+                `formation_cycles_stitched` : pandas.DataFrame
+                    The voltage-vs-capacity dataframes for each full formation cycle, with a break added between charge and discharge half cycles
+
+                `formation_charge_cap` : numpy.ndarray
+                    The charge capacity for each formation cycle
+
+                `formation_discharge_cap` : numpy.ndarray
+                    The discharge capacity for each formation cycle
+
+                `formation_CE` : np.ndarray
+                    The Coulombic efficiency for each formation cycle
+
+        """
+        formation_cycles_separate = [
+            [
+                self.VvsCapacity_hc(
+                    self.FORMATION_CHARGE[0], self.FORMATION_CHARGE[1] + 2 * i
+                ), 
+                self.VvsCapacity_hc(
+                    self.FORMATION_DISCHARGE[0], self.FORMATION_DISCHARGE[1] + 2 * i
+                )
+            ] for i in range(self.NUM_FORMATION_CYCLES)
+        ]
+        formation_cycles_stitched = [
+            self.stitchHalfCycles(formation_cycles_separate[i], add_breaks = True) for i in range(self.NUM_FORMATION_CYCLES)
+        ]
+        formation_charge_cap = np.array([self.capacityDiff(cycle[0]) for cycle in formation_cycles_separate])
+        formation_discharge_cap = np.array([self.capacityDiff(cycle[1]) for cycle in formation_cycles_separate])
+        formation_CE = formation_discharge_cap / formation_charge_cap
+        return formation_cycles_separate, formation_cycles_stitched, formation_charge_cap, formation_discharge_cap, formation_CE
+    
+    def process_test_cycles(self):
+        """
+        Extracts and processes information pertaining to the test cycles.
+
+        Parameters
+        --------
+
+        Returns
+        --------
+        pandas.Series
+            A series containing 5 elements, described below.
+
+                `test_cycles_separate` : pandas.DataFrame
+                    The voltage-vs-capacity dataframes for each half test cycle, separated
+
+                `test_cycles_stitched` : pandas.DataFrame
+                    The voltage-vs-capacity dataframes for each full test cycle, with a break added between charge and discharge half cycles
+
+                `test_charge_cap` : numpy.ndarray
+                    The charge capacity for each test cycle
+
+                `test_discharge_cap` : numpy.ndarray
+                    The discharge capacity for each test cycle
+
+                `test_CE` : np.ndarray
+                    The Coulombic efficiency for each test cycle
+
+        """
+        test_cycles_separate = []
+        cyc_num = 0
+        while True:
+            test_cycle_charge = self.VvsCapacity_hc(self.CYCLE_CHARGE[0], self.CYCLE_CHARGE[1] + 2 * cyc_num)
+            if not self.checkHalfCycle(test_cycle_charge): break
+            test_cycle_discharge = self.VvsCapacity_hc(self.CYCLE_DISCHARGE[0], self.CYCLE_DISCHARGE[1] + 2 * cyc_num)
+            if not self.checkHalfCycle(test_cycle_discharge): break
+            test_cycles_separate.append([test_cycle_charge, test_cycle_discharge])
+            cyc_num += 1
+            
+        test_cycles_stitched = [
+            self.stitchHalfCycles(test_cycles_separate[i], add_breaks = True) for i in range(len(test_cycles_separate))
+        ]
+        test_charge_cap = np.array([self.capacityDiff(cycle[0]) for cycle in test_cycles_separate])
+        test_discharge_cap = np.array([self.capacityDiff(cycle[1]) for cycle in test_cycles_separate])
+        test_CE = test_discharge_cap / test_charge_cap
+        return test_cycles_separate, test_cycles_stitched, test_charge_cap, test_discharge_cap, test_CE
     

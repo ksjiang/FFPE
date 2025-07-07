@@ -27,16 +27,16 @@ class NewareExperiment(object):
         self.measurement_sequence = Y
         return
     
-    def getCycleDataIdx_hc(self, cycle, half_cycle, include_rest):
+    def getCycleDataIdx_hc(self, step_num, half_cycle, include_rest):
         if include_rest:
-            indices = self.measurement_sequence[((self.measurement_sequence["Ns"] == cycle) | (self.measurement_sequence["Ns"] == cycle + 1)) & (self.measurement_sequence["half cycle"] == half_cycle)].index
+            indices = self.measurement_sequence[((self.measurement_sequence["Ns"] == step_num) | (self.measurement_sequence["Ns"] == step_num + 1)) & (self.measurement_sequence["half cycle"] == half_cycle)].index
         else:
-            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == cycle) & (self.measurement_sequence["half cycle"] == half_cycle)].index
+            indices = self.measurement_sequence[(self.measurement_sequence["Ns"] == step_num) & (self.measurement_sequence["half cycle"] == half_cycle)].index
             
         return indices
     
-    def getCycleData_hc(self, cycle, half_cycle, include_rest):
-        return self.measurement_sequence.loc[self.getCycleDataIdx_hc(cycle, half_cycle, include_rest)]
+    def getCycleData_hc(self, step_num, half_cycle, include_rest):
+        return self.measurement_sequence.loc[self.getCycleDataIdx_hc(step_num, half_cycle, include_rest)]
     
     
 class NewareMODE1CyclingExperiment(NewareExperiment, cycle_tools.MODE1CyclingExperiment):
@@ -50,6 +50,13 @@ class NewarePNNLCyclingExperiment(NewareExperiment, cycle_tools.PNNLCyclingExper
     def __init__(self, area):
         NewareExperiment.__init__(self)
         cycle_tools.PNNLCyclingExperiment.__init__(self, area, REST = (1, 0), INITIAL_PLATING = (2, 1), INITIAL_STRIPPING = (4, 2), TEST_PLATING = (6, 3), SHORT_CYCLE_STRIPPING = (8, 4), SHORT_CYCLE_PLATING = (10, 5), TEST_STRIPPING = (13, 24), NUM_SHORT_CYCLES = 10)
+        return
+    
+
+class NewareFormationCyclingExperiment(NewareExperiment, cycle_tools.FormationCyclingExperiment):
+    def __init__(self, area, num_formation):
+        NewareExperiment.__init__(self)
+        cycle_tools.FormationCyclingExperiment.__init__(self, area, REST = (1, 0), FORMATION_CHARGE = (2, 1), FORMATION_DISCHARGE = (4, 2), NUM_FORMATION_CYCLES = num_formation, CYCLE_CHARGE = (7, 1 + 2 * num_formation), CYCLE_DISCHARGE = (9, 2 + 2 * num_formation))
         return
     
     

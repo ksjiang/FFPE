@@ -7,6 +7,7 @@ A collection of useful functions for converting between units found on battery t
 
 # current
 UA2MA = lambda x: x * 1E-3
+A2MA = lambda x: x * 1E3
 
 # voltage
 TMV2V = lambda x: x * 1E-4
@@ -22,6 +23,7 @@ S2HR = lambda x: x / 3600.
 # capacity
 UAS2MAH = lambda x: S2HR(UA2MA(x))
 MAS2MAH = lambda x: S2HR(x)
+AH2MAH = lambda x: A2MA(x)
 
 # energy
 UWS2WH = lambda x: S2HR(UW2W(x))
