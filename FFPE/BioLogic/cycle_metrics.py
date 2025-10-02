@@ -49,4 +49,9 @@ class BiologicPNNLCyclingExperiment(BiologicExperiment, cycle_tools.PNNLCyclingE
         cycle_tools.PNNLCyclingExperiment.__init__(self, area, REST = (0, 0), INITIAL_PLATING = (1, 0), INITIAL_STRIPPING = (2, 1), TEST_PLATING = (3, 2), SHORT_CYCLE_STRIPPING = (4, 3), SHORT_CYCLE_PLATING = (5, 4), TEST_STRIPPING = (6, 23), NUM_SHORT_CYCLES = 10)
         return
     
+class BiologicFormationCyclingExperiment(BiologicExperiment, cycle_tools.FormationCyclingExperiment):
+    def __init__(self, area, num_formation, version = MPRff.ACCEPTED_VERSIONS[-1], hc = 0):
+        BiologicExperiment.__init__(self, version, hc)
+        cycle_tools.FormationCyclingExperiment.__init__(self, area, REST = (0, 0), FORMATION_CHARGE = (1, 0), FORMATION_DISCHARGE = (3, 1), NUM_FORMATION_CYCLES = num_formation, CYCLE_CHARGE = (6, 2 * num_formation), CYCLE_DISCHARGE = (8, 1 + 2 * num_formation))
+        return
     

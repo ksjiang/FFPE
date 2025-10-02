@@ -50,6 +50,7 @@ VMP_DATA_FIELD_LIST = {
     0xb: ("<I>_mA", *common.DOUBLE, *common.NONE_FIELD), 
     0xd: ("Q-Q0", *common.DOUBLE, *common.NONE_FIELD), 
     0x13: ("control V", *common.SINGLE, *common.NONE_FIELD), 
+    0x14: ("control I", *common.SINGLE, *common.NONE_FIELD), 
     0x15: ("control change", *common.NONE_FIELD, 4, 1), 
     0x18: ("cycle number", *common.DOUBLE, *common.NONE_FIELD), 
     0x1f: ("Ns change", *common.NONE_FIELD, 5, 1), 

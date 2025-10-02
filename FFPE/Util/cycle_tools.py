@@ -167,7 +167,23 @@ class MODE1CyclingExperiment(GalvanostaticCyclingExperiment):
             cyc_num += 1
             
         return np.array(CEs)
-        
+    
+    def calculate_capacities(self, num_cycles):
+        plating_caps = []
+        stripping_caps = []
+        for i in range(num_cycles):
+            plating = self.VvsCapacity_hc(self.CYCLE_PLATING[0], self.CYCLE_PLATING[1] + 2 * i)
+            if not self.checkHalfCycle(plating): assert False, "Incomplete experiment"
+            plating_caps.append(self.capacityDiff(plating))
+            stripping = self.VvsCapacity_hc(self.CYCLE_STRIPPING[0], self.CYCLE_STRIPPING[1] + 2 * i)
+            if not self.checkHalfCycle(stripping): assert False, "Incomplete experiment"
+            stripping_caps.append(self.capacityDiff(stripping))
+
+        return np.array(plating_caps), np.array(stripping_caps)
+    
+    def calculate_capacity_loss(self, num_cycles):
+        plating_caps, stripping_caps = self.calculate_capacities(num_cycles)
+        return np.sum(plating_caps) - np.sum(stripping_caps)
     
 # class representing PNNL cycling experiments
 class PNNLCyclingExperiment(GalvanostaticCyclingExperiment):
@@ -274,8 +290,8 @@ class FormationCyclingExperiment(GalvanostaticCyclingExperiment):
         formation_cycles_stitched = [
             self.stitchHalfCycles(formation_cycles_separate[i], add_breaks = True) for i in range(self.NUM_FORMATION_CYCLES)
         ]
-        formation_charge_cap = np.array([self.capacityDiff(cycle[0]) for cycle in formation_cycles_separate])
-        formation_discharge_cap = np.array([self.capacityDiff(cycle[1]) for cycle in formation_cycles_separate])
+        formation_charge_cap = np.array([self.capacityDiff(cycle[0]) if cycle[0]["capacity"].shape[0] > 0 else np.NaN for cycle in formation_cycles_separate])
+        formation_discharge_cap = np.array([self.capacityDiff(cycle[1]) if cycle[1]["capacity"].shape[0] > 0 else np.NaN for cycle in formation_cycles_separate])
         formation_CE = formation_discharge_cap / formation_charge_cap
         return formation_cycles_separate, formation_cycles_stitched, formation_charge_cap, formation_discharge_cap, formation_CE
     
